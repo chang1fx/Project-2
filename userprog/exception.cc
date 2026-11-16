@@ -1,4 +1,4 @@
-// exception.cc 
+// exception.cc
 //	Entry point into the Nachos kernel from user programs.
 //	There are two kinds of things that can cause control to
 //	transfer back to here from user code:
@@ -9,7 +9,7 @@
 //
 //	exceptions -- The user code does something that the CPU can't handle.
 //	For instance, accessing memory that doesn't exist, arithmetic errors,
-//	etc.  
+//	etc.
 //
 //	Interrupts (which can also cause control to transfer from user
 //	code into the Nachos kernel) are handled elsewhere.
@@ -18,12 +18,43 @@
 // Everything else core dumps.
 //
 // Copyright (c) 1992-1993 The Regents of the University of California.
-// All rights reserved.  See copyright.h for copyright notice and limitation 
+// All rights reserved.  See copyright.h for copyright notice and limitation
 // of liability and disclaimer of warranty provisions.
 
 #include "copyright.h"
 #include "system.h"
 #include "syscall.h"
+
+#if defined(CHANGED) && defined(USER_PROGRAM)
+
+//----------------------------------------------------------------------
+// IncrementPC
+//	Advance the user program counter past the syscall instruction.
+//	Without this, returning to user mode re-executes the same
+//	syscall forever.
+//----------------------------------------------------------------------
+
+static void
+IncrementPC()
+{
+    int pc = machine->ReadRegister(PCReg);
+    machine->WriteRegister(PrevPCReg, pc);
+    pc = machine->ReadRegister(NextPCReg);
+    machine->WriteRegister(PCReg, pc);
+    machine->WriteRegister(NextPCReg, pc + 4);
+}
+
+//----------------------------------------------------------------------
+// CurrentPid
+//	Process id of the running user program.
+//	TEMPORARY: returns 0 until the PCB/ProcessManager exist (Phase 4).
+//----------------------------------------------------------------------
+
+static int
+CurrentPid()
+{
+    return 0;
+}
 
 //----------------------------------------------------------------------
 // ExceptionHandler
@@ -39,12 +70,67 @@
 //		arg3 -- r6
 //		arg4 -- r7
 //
-//	The result of the system call, if any, must be put back into r2. 
+//	The result of the system call, if any, must be put back into r2.
+//----------------------------------------------------------------------
+
+void
+ExceptionHandler(ExceptionType which)
+{
+    int type = machine->ReadRegister(2);
+
+    if (which != SyscallException) {
+	printf("Unexpected user mode exception %d %d\n", which, type);
+	ASSERT(FALSE);
+    }
+
+    switch (type) {
+    case SC_Halt:
+	DEBUG('a', "Shutdown, initiated by user program.\n");
+	interrupt->Halt();
+	break;
+
+    case SC_Fork:
+	printf("System Call: %d invoked Fork\n", CurrentPid());
+	// TEMPORARY: Fork is implemented in Phase 5; fail for now.
+	machine->WriteRegister(2, -1);
+	IncrementPC();
+	break;
+
+    case SC_Yield:
+	printf("System Call: %d invoked Yield\n", CurrentPid());
+	IncrementPC();			// advance first, so we resume after
+					// the syscall when rescheduled
+	currentThread->Yield();
+	break;
+
+    default:
+	printf("Unexpected user mode exception %d %d\n", which, type);
+	ASSERT(FALSE);
+    }
+}
+
+#else
+
+//----------------------------------------------------------------------
+// ExceptionHandler
+// 	Entry point into the Nachos kernel.  Called when a user program
+//	is executing, and either does a syscall, or generates an addressing
+//	or arithmetic exception.
+//
+// 	For system calls, the following is the calling convention:
+//
+// 	system call code -- r2
+//		arg1 -- r4
+//		arg2 -- r5
+//		arg3 -- r6
+//		arg4 -- r7
+//
+//	The result of the system call, if any, must be put back into r2.
 //
 // And don't forget to increment the pc before returning. (Or else you'll
 // loop making the same system call forever!
 //
-//	"which" is the kind of exception.  The list of possible exceptions 
+//	"which" is the kind of exception.  The list of possible exceptions
 //	are in machine.h.
 //----------------------------------------------------------------------
 
@@ -61,3 +147,5 @@ ExceptionHandler(ExceptionType which)
 	ASSERT(FALSE);
     }
 }
+
+#endif

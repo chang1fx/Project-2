@@ -100,7 +100,7 @@ Semaphore::V()
 // Dummy functions -- so we can compile our later assignments 
 // Note -- without a correct implementation of Condition::Wait(), 
 // the test case in the network assignment won't work!
-#if defined(CHANGED) && defined(THREADS)
+#if defined(CHANGED) && (defined(THREADS) || defined(USER_PROGRAM))
 //----------------------------------------------------------------------
 // Lock::Lock
 //      Initialize a lock to FREE.
@@ -182,7 +182,7 @@ void Lock::Acquire() {}
 void Lock::Release() {}
 #endif
 
-#if defined(CHANGED) && defined(THREADS)
+#if defined(CHANGED) && (defined(THREADS) || defined(USER_PROGRAM))
 //----------------------------------------------------------------------
 // Condition::Condition
 //      Initialize a condition variable with no waiting threads.

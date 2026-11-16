@@ -81,7 +81,7 @@ class Lock {
     char* name;				// for debugging
     // plus some other stuff you'll need to define
 	    // plus some other stuff you'll need to define
-#if defined(CHANGED) && defined(THREADS)
+#if defined(CHANGED) && (defined(THREADS) || defined(USER_PROGRAM))
     Thread *owner;      // thread currently holding the lock, NULL if free
     List *queue;        // threads waiting to acquire the lock
 #endif
@@ -136,7 +136,7 @@ class Condition {
 
   private:
     char* name;
-#if defined(CHANGED) && defined(THREADS)
+#if defined(CHANGED) && (defined(THREADS) || defined(USER_PROGRAM))
     List *queue;        // threads waiting on this condition
 #endif
     // plus some other stuff you'll need to define

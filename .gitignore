@@ -1,0 +1,11 @@
+*.o
+*.coff
+swtch.s
+*/nachos
+DISK
+test/*
+!test/*.c
+!test/*.h
+!test/*.s
+!test/*.S
+!test/Makefile

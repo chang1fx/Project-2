@@ -31,6 +31,14 @@ StartProcess(char *filename)
 	return;
     }
     space = new AddrSpace(executable);    
+#if defined(CHANGED) && defined(USER_PROGRAM)
+    if (!space->IsValid()) {		// not enough memory, or bad file
+	printf("Unable to load program %s\n", filename);
+	delete space;
+	delete executable;
+	return;
+    }
+#endif
     currentThread->space = space;
 
     delete executable;			// close file

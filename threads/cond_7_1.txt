@@ -1,0 +1,35 @@
+--- producer/consumer test ---
+produced 0 (count 1)
+produced 1 (count 2)
+produced 2 (count 3)
+consumed 0 (count 2)
+consumed 1 (count 1)
+consumed 2 (count 0)
+produced 3 (count 1)
+produced 4 (count 2)
+produced 5 (count 3)
+consumed 3 (count 2)
+consumed 4 (count 1)
+consumed 5 (count 0)
+produced 6 (count 1)
+produced 7 (count 2)
+produced 8 (count 3)
+consumed 6 (count 2)
+consumed 7 (count 1)
+consumed 8 (count 0)
+produced 9 (count 1)
+consumed 9 (count 0)
+--- broadcast test with 1 waiters ---
+waiter 1 released
+broadcast released 1 of 1 waiters
+No threads ready or runnable, and no pending interrupts.
+Assuming the program completed.
+Machine halting!
+
+Ticks: total 994, idle 4, system 990, user 0
+Disk I/O: reads 0, writes 0
+Console I/O: reads 0, writes 0
+Paging: faults 0
+Network I/O: packets received 0, sent 0
+
+Cleaning up...

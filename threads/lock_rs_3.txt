@@ -1,0 +1,35 @@
+*** thread 1 sees value 0
+*** thread 2 sees value 1
+*** thread 3 sees value 2
+*** thread 0 sees value 3
+*** thread 1 sees value 4
+*** thread 2 sees value 5
+*** thread 3 sees value 6
+*** thread 2 sees value 7
+*** thread 3 sees value 8
+*** thread 0 sees value 9
+*** thread 3 sees value 10
+*** thread 2 sees value 11
+*** thread 1 sees value 12
+*** thread 2 sees value 13
+*** thread 3 sees value 14
+*** thread 0 sees value 15
+*** thread 1 sees value 16
+*** thread 1 sees value 17
+*** thread 0 sees value 18
+*** thread 0 sees value 19
+Thread 0 sees final value 20
+Thread 3 sees final value 20
+Thread 2 sees final value 20
+Thread 1 sees final value 20
+No threads ready or runnable, and no pending interrupts.
+Assuming the program completed.
+Machine halting!
+
+Ticks: total 1332, idle 12, system 1320, user 0
+Disk I/O: reads 0, writes 0
+Console I/O: reads 0, writes 0
+Paging: faults 0
+Network I/O: packets received 0, sent 0
+
+Cleaning up...

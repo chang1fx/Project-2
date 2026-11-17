@@ -1,0 +1,58 @@
+Person 1 wants to go to floor 5 from floor 1.
+Person 2 wants to go to floor 3 from floor 1.
+Person 3 wants to go to floor 4 from floor 1.
+Person 4 wants to go to floor 2 from floor 1.
+Person 5 wants to go to floor 5 from floor 1.
+Person 6 wants to go to floor 3 from floor 1.
+Person 7 wants to go to floor 1 from floor 3.
+Person 8 wants to go to floor 2 from floor 4.
+Elevator arrives on floor 1.
+Person 1 got into the elevator.
+Person 2 got into the elevator.
+Person 3 got into the elevator.
+Person 4 got into the elevator.
+Person 5 got into the elevator.
+Elevator arrives on floor 2.
+Person 4 got out of the elevator.
+Elevator arrives on floor 3.
+Person 7 got into the elevator.
+Person 2 got out of the elevator.
+Elevator arrives on floor 4.
+Person 8 got into the elevator.
+Person 3 got out of the elevator.
+Elevator arrives on floor 5.
+Person 1 got out of the elevator.
+Person 5 got out of the elevator.
+Elevator arrives on floor 4.
+Person 9 wants to go to floor 1 from floor 5.
+Person 10 wants to go to floor 4 from floor 2.
+Elevator arrives on floor 3.
+Elevator arrives on floor 2.
+Person 8 got out of the elevator.
+Person 10 got into the elevator.
+Elevator arrives on floor 1.
+Person 6 got into the elevator.
+Person 7 got out of the elevator.
+Elevator arrives on floor 2.
+Elevator arrives on floor 3.
+Person 6 got out of the elevator.
+Elevator arrives on floor 4.
+Person 10 got out of the elevator.
+Elevator arrives on floor 5.
+Person 9 got into the elevator.
+Elevator arrives on floor 4.
+Elevator arrives on floor 3.
+Elevator arrives on floor 2.
+Elevator arrives on floor 1.
+Person 9 got out of the elevator.
+No threads ready or runnable, and no pending interrupts.
+Assuming the program completed.
+Machine halting!
+
+Ticks: total 12830, idle 0, system 12830, user 0
+Disk I/O: reads 0, writes 0
+Console I/O: reads 0, writes 0
+Paging: faults 0
+Network I/O: packets received 0, sent 0
+
+Cleaning up...

@@ -153,6 +153,51 @@ AddrSpace::AddrSpace(OpenFile *executable)
 }
 
 //----------------------------------------------------------------------
+// AddrSpace::AddrSpace(AddrSpace *parent)
+// 	Used by Fork. Build a copy of "parent": the same number of pages,
+//	each one a newly allocated physical page holding a copy of the
+//	parent's page. After this, parent and child share nothing.
+//
+//	If there is not enough free memory, nothing is allocated and
+//	IsValid() returns FALSE.
+//----------------------------------------------------------------------
+
+AddrSpace::AddrSpace(AddrSpace *parent)
+{
+    valid = FALSE;
+    pageTable = NULL;
+    numPages = 0;
+    pcb = NULL;
+
+    if ((int)parent->numPages > memoryManager->freePages()) {
+	DEBUG('a', "Fork: not enough memory: need %d pages, %d free\n",
+		parent->numPages, memoryManager->freePages());
+	return;
+    }
+
+    numPages = parent->numPages;
+    pageTable = new TranslationEntry[numPages];
+    for (unsigned int i = 0; i < numPages; i++) {
+	int phys = memoryManager->getPage();
+	if (phys < 0) {			// should not happen after the check
+	    for (unsigned int j = 0; j < i; j++)
+		memoryManager->clearPage(pageTable[j].physicalPage);
+	    delete [] pageTable;
+	    pageTable = NULL;
+	    numPages = 0;
+	    return;
+	}
+	pageTable[i] = parent->pageTable[i];	// same flags
+	pageTable[i].physicalPage = phys;
+	memcpy(&(machine->mainMemory[phys * PageSize]),
+	       &(machine->mainMemory[parent->pageTable[i].physicalPage * PageSize]),
+	       PageSize);
+    }
+
+    valid = TRUE;
+}
+
+//----------------------------------------------------------------------
 // AddrSpace::~AddrSpace
 // 	Give every physical page back to the MemoryManager.
 //----------------------------------------------------------------------

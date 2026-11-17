@@ -28,6 +28,10 @@ class AddrSpace {
 					// initializing it with the program
 					// stored in the file "executable"
     ~AddrSpace();			// De-allocate an address space
+#if defined(CHANGED) && defined(USER_PROGRAM)
+    AddrSpace(AddrSpace *parent);	// Fork: a copy of "parent", in its
+					// own newly allocated physical pages
+#endif
 
     void InitRegisters();		// Initialize user-level CPU registers,
 					// before jumping to user code

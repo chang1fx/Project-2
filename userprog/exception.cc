@@ -59,6 +59,105 @@ CurrentPid()
 }
 
 //----------------------------------------------------------------------
+// Fork support
+//	The parent's user registers are captured at the moment of the
+//	syscall and handed to the new kernel thread, which loads them,
+//	points the PC at "func", and starts running user code.
+//
+//	All registers are copied unchanged except the PC. In particular
+//	the return-address register (r31) still holds the address just
+//	after the parent's call to Fork(), so when "func" returns, the
+//	child continues at the instruction after the initial Fork.
+//----------------------------------------------------------------------
+
+struct ForkArgs {
+    int registers[NumTotalRegs];	// parent's user registers
+    int func;				// where the child starts
+};
+
+static void
+ForkedProcessStart(int arg)
+{
+    ForkArgs *args = (ForkArgs *) arg;
+
+    for (int i = 0; i < NumTotalRegs; i++)
+	machine->WriteRegister(i, args->registers[i]);
+    machine->WriteRegister(PrevPCReg, args->func - 4);
+    machine->WriteRegister(PCReg, args->func);
+    machine->WriteRegister(NextPCReg, args->func + 4);
+    delete args;
+
+    currentThread->space->RestoreState();	// load the child's page table
+    machine->Run();				// jump to user code
+    ASSERT(FALSE);				// Run never returns
+}
+
+static int
+DoFork(int func)
+{
+    AddrSpace *parentSpace = currentThread->space;
+    int dummy;
+
+    // func must be a word-aligned address inside our address space
+    if ((func % 4) != 0 || !parentSpace->Translate(func, &dummy))
+	return -1;
+
+    int pid = processManager->getPID();
+    if (pid < 0)				// process table full
+	return -1;
+
+    AddrSpace *childSpace = new AddrSpace(parentSpace);
+    if (!childSpace->IsValid()) {		// not enough memory
+	delete childSpace;
+	processManager->clearPID(pid);
+	return -1;
+    }
+
+    Thread *childThread = new Thread("forked process");
+    childThread->space = childSpace;
+
+    PCB *childPCB = new PCB(pid, parentSpace->pcb, childThread);
+    processManager->setPCB(pid, childPCB);
+    childSpace->pcb = childPCB;
+
+    ForkArgs *args = new ForkArgs;
+    for (int i = 0; i < NumTotalRegs; i++)
+	args->registers[i] = machine->ReadRegister(i);
+    args->func = func;
+
+    printf("Process %d Fork: start at address 0x%x with %d pages memory\n",
+	   CurrentPid(), func, childSpace->GetNumPages());
+
+    childThread->Fork(ForkedProcessStart, (int) args);
+    return pid;
+}
+
+//----------------------------------------------------------------------
+// DoExit
+//	TEMPORARY minimal Exit so forked processes can finish while the
+//	real Exit (owned by a teammate) is being written. Frees the
+//	process's pid, PCB and memory, then ends its kernel thread.
+//	REPLACE with the real Exit implementation.
+//----------------------------------------------------------------------
+
+static void
+DoExit(int status)
+{
+    AddrSpace *space = currentThread->space;
+    PCB *pcb = space->pcb;
+
+    printf("Process %d exits with %d\n", pcb->pid, status);
+    pcb->exitStatus = status;
+    pcb->exited = TRUE;
+
+    processManager->clearPID(pcb->pid);
+    delete pcb;
+    currentThread->space = NULL;	// don't save state for a dead space
+    delete space;			// gives its pages back
+    currentThread->Finish();
+}
+
+//----------------------------------------------------------------------
 // ExceptionHandler
 // 	Entry point into the Nachos kernel.  Called when a user program
 //	is executing, and either does a syscall, or generates an addressing
@@ -93,9 +192,13 @@ ExceptionHandler(ExceptionType which)
 
     case SC_Fork:
 	printf("System Call: %d invoked Fork\n", CurrentPid());
-	// TEMPORARY: Fork is implemented in Phase 5; fail for now.
-	machine->WriteRegister(2, -1);
+	machine->WriteRegister(2, DoFork(machine->ReadRegister(4)));
 	IncrementPC();
+	break;
+
+    case SC_Exit:			// TEMPORARY, see DoExit
+	printf("System Call: %d invoked Exit\n", CurrentPid());
+	DoExit(machine->ReadRegister(4));
 	break;
 
     case SC_Yield:

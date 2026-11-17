@@ -184,3 +184,8 @@ void AddrSpace::RestoreState()
     machine->pageTable = pageTable;
     machine->pageTableSize = numPages;
 }
+
+#if defined(CHANGED) && defined(USER_PROGRAM)
+#include "memorymanager.h"
+MemoryManager *memoryManager = NULL;   // created in Phase 3
+#endif

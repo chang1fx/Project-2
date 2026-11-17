@@ -13,6 +13,9 @@
 #include "console.h"
 #include "addrspace.h"
 #include "synch.h"
+#if defined(CHANGED) && defined(USER_PROGRAM)
+#include "pcb.h"
+#endif
 
 //----------------------------------------------------------------------
 // StartProcess
@@ -38,6 +41,15 @@ StartProcess(char *filename)
 	delete executable;
 	return;
     }
+
+    // The first program becomes process 1.
+    if (processManager == NULL)
+	processManager = new ProcessManager(MAX_PROCESSES);
+    int pid = processManager->getPID();
+    ASSERT(pid > 0);			// table is empty at this point
+    PCB *pcb = new PCB(pid, NULL, currentThread);
+    processManager->setPCB(pid, pcb);
+    space->pcb = pcb;
 #endif
     currentThread->space = space;
 

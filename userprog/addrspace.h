@@ -18,6 +18,10 @@
 
 #define UserStackSize		1024 	// increase this as necessary!
 
+#if defined(CHANGED) && defined(USER_PROGRAM)
+class PCB;
+#endif
+
 class AddrSpace {
   public:
     AddrSpace(OpenFile *executable);	// Create an address space,
@@ -44,6 +48,8 @@ class AddrSpace {
 					// Copy "size" bytes at "fileAddr" in
 					// "file" into this space, starting at
 					// virtual address "virtAddr"
+
+    PCB *pcb;				// the process that owns this space
 #endif
 
   private:

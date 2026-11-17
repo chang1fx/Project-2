@@ -25,8 +25,10 @@
 #if defined(CHANGED) && defined(USER_PROGRAM)
 #include <string.h>
 #include "memorymanager.h"
+#include "pcb.h"
 
 MemoryManager *memoryManager = NULL;	// created by the first AddrSpace
+ProcessManager *processManager = NULL;	// created in StartProcess
 #endif
 
 //----------------------------------------------------------------------
@@ -75,6 +77,7 @@ AddrSpace::AddrSpace(OpenFile *executable)
     valid = FALSE;
     pageTable = NULL;
     numPages = 0;
+    pcb = NULL;
 
     if (memoryManager == NULL)
 	memoryManager = new MemoryManager(NumPhysPages);

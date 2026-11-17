@@ -26,6 +26,7 @@
 #include "syscall.h"
 
 #if defined(CHANGED) && defined(USER_PROGRAM)
+#include "pcb.h"
 
 //----------------------------------------------------------------------
 // IncrementPC
@@ -46,14 +47,15 @@ IncrementPC()
 
 //----------------------------------------------------------------------
 // CurrentPid
-//	Process id of the running user program.
-//	TEMPORARY: returns 0 until the PCB/ProcessManager exist (Phase 4).
+//	Process id of the running user program (-1 if it has no PCB).
 //----------------------------------------------------------------------
 
 static int
 CurrentPid()
 {
-    return 0;
+    if (currentThread->space == NULL || currentThread->space->pcb == NULL)
+	return -1;
+    return currentThread->space->pcb->pid;
 }
 
 //----------------------------------------------------------------------

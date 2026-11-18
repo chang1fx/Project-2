@@ -146,16 +146,21 @@ DoExit(int status)
     AddrSpace *space = currentThread->space;
     PCB *pcb = space->pcb;
 
-    printf("Process %d exits with %d\n", pcb->pid, status);
-    pcb->exitStatus = status;
-    pcb->exited = TRUE;
+    printf("Process [%d] exits with [%d]\n", pcb->pid, status);
 
-    processManager->clearPID(pcb->pid);
-    delete pcb;
-    currentThread->space = NULL;	// don't save state for a dead space
-    delete space;			// gives its pages back
+    currentThread->space = NULL;
+    delete space;
+    processManager->finishProcess(pcb, status);
     currentThread->Finish();
+    ASSERT(FALSE);
 }
+
+static int
+DoJoin(int pid)
+{
+    return processManager->joinProcess(currentThread->space->pcb, pid);
+}
+
 
 //----------------------------------------------------------------------
 // ExceptionHandler
@@ -196,10 +201,15 @@ ExceptionHandler(ExceptionType which)
 	IncrementPC();
 	break;
 
-    case SC_Exit:			// TEMPORARY, see DoExit
-	printf("System Call: %d invoked Exit\n", CurrentPid());
-	DoExit(machine->ReadRegister(4));
-	break;
+    case SC_Exit:
+        printf("System Call: [%d] invoked Exit.\n", CurrentPid());
+        DoExit(machine->ReadRegister(4));
+        break;
+    case SC_Join:
+        printf("System Call: [%d] invoked Join.\n", CurrentPid());
+        machine->WriteRegister(2, DoJoin(machine->ReadRegister(4)));
+        IncrementPC();
+        break;
 
     case SC_Yield:
 	printf("System Call: %d invoked Yield\n", CurrentPid());

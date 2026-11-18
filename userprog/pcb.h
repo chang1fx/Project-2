@@ -43,6 +43,11 @@ class PCB {
         thread = t;
         exitStatus = 0;
         exited = FALSE;
+	exitCondition = new Condition("process exit");
+    }
+    ~PCB()
+    {
+        delete exitCondition;
     }
 
     int pid;			// process id
@@ -50,8 +55,8 @@ class PCB {
     Thread *thread;		// kernel thread running this process
     int exitStatus;		// set by Exit
     bool exited;		// TRUE once the process has exited
-
     // ---- teammates: add your fields below this line ----
+    Condition *exitCondition;
 };
 
 class ProcessManager {
@@ -114,7 +119,65 @@ class ProcessManager {
         return pcb;
     }
 
+    // Only a direct parent may Join a child, once.
+    int joinProcess(PCB *parentPCB, int pid)
+    {
+        lock->Acquire();
+        PCB *child = NULL;
+        if (pid > 0 && pid < size)
+            child = table[pid];
+
+        if (parentPCB == NULL || child == NULL ||
+            child == parentPCB || child->parent != parentPCB) {
+            lock->Release();
+            return -1;
+        }
+
+        while (!child->exited)
+            child->exitCondition->Wait(lock);
+
+        int status = child->exitStatus;
+        reapLocked(child);
+        lock->Release();
+        return status;
+    }
+
+    // Address space must already have been released.
+    void finishProcess(PCB *pcb, int status)
+    {
+        lock->Acquire();
+        pcb->exitStatus = status;
+        pcb->exited = TRUE;
+        pcb->thread = NULL;
+
+        for (int i = 1; i < size; i++) {
+            PCB *child = table[i];
+            if (child != NULL && child->parent == pcb) {
+                child->parent = NULL;
+                if (child->exited)
+                    reapLocked(child);
+            }
+        }
+
+        if (pcb->parent == NULL)
+            reapLocked(pcb);
+        else
+            pcb->exitCondition->Broadcast(lock);
+
+        lock->Release();
+    }
+
   private:
+    // Caller holds lock; the process has already exited.
+    void reapLocked(PCB *pcb)
+    {
+        ASSERT(lock->isHeldByCurrentThread());
+        ASSERT(pcb->exited);
+        int pid = pcb->pid;
+        table[pid] = NULL;
+        pids->Clear(pid);
+        delete pcb;
+    }
     int size;			// number of slots
     BitMap *pids;		// set bit = pid in use
     PCB **table;		// pid -> PCB

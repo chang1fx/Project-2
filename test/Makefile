@@ -31,16 +31,40 @@ CC = $(GCCDIR)gcc -B../../../gnu-decstation-ultrix/
 AS = $(GCCDIR)as
 LD = $(GCCDIR)ld
 
-CPP = gcc -m32 -E
+CPP = gcc -E
 INCDIR =-I../userprog -I../threads
 CFLAGS = -G 0 -c $(INCDIR)
 
-all: halt shell matmult sort yieldtest forktest fork3 forkret forkbad
+all: halt shell matmult sort fork join kill exec memory
 
 start.o: start.s ../userprog/syscall.h
 	$(CPP) $(CPPFLAGS) start.c > strt.s
 	$(AS) $(ASFLAGS) -o start.o strt.s
 	rm strt.s
+
+fork.o: fork.c
+	$(CC) $(CFLAGS) fork.c
+fork: fork.o start.o
+	$(LD) $(LDFLAGS) start.o fork.o -o fork.coff
+	../bin/coff2noff fork.coff fork 
+
+join.o: join.c
+	$(CC) $(CFLAGS) join.c
+join:   join.o start.o
+	$(LD) $(LDFLAGS) start.o join.o -o join.coff
+	../bin/coff2noff join.coff join 
+
+kill.o: kill.c
+	$(CC) $(CFLAGS) kill.c
+kill:   kill.o start.o
+	$(LD) $(LDFLAGS) start.o kill.o -o kill.coff
+	../bin/coff2noff kill.coff kill 
+
+exec.o: exec.c
+	$(CC) $(CFLAGS) exec.c
+exec: exec.o start.o
+	$(LD) $(LDFLAGS) start.o exec.o -o exec.coff
+	../bin/coff2noff exec.coff exec 
 
 halt.o: halt.c
 	$(CC) $(CFLAGS) -c halt.c
@@ -66,32 +90,8 @@ matmult: matmult.o start.o
 	$(LD) $(LDFLAGS) start.o matmult.o -o matmult.coff
 	../bin/coff2noff matmult.coff matmult
 
-yieldtest.o: yieldtest.c
-	$(CC) $(CFLAGS) -c yieldtest.c
-yieldtest: yieldtest.o start.o
-	$(LD) $(LDFLAGS) start.o yieldtest.o -o yieldtest.coff
-	../bin/coff2noff yieldtest.coff yieldtest
-
-forktest.o: forktest.c
-	$(CC) $(CFLAGS) -c forktest.c
-forktest: forktest.o start.o
-	$(LD) $(LDFLAGS) start.o forktest.o -o forktest.coff
-	../bin/coff2noff forktest.coff forktest
-
-fork3.o: fork3.c
-	$(CC) $(CFLAGS) -c fork3.c
-fork3: fork3.o start.o
-	$(LD) $(LDFLAGS) start.o fork3.o -o fork3.coff
-	../bin/coff2noff fork3.coff fork3
-
-forkret.o: forkret.c
-	$(CC) $(CFLAGS) -c forkret.c
-forkret: forkret.o start.o
-	$(LD) $(LDFLAGS) start.o forkret.o -o forkret.coff
-	../bin/coff2noff forkret.coff forkret
-
-forkbad.o: forkbad.c
-	$(CC) $(CFLAGS) -c forkbad.c
-forkbad: forkbad.o start.o
-	$(LD) $(LDFLAGS) start.o forkbad.o -o forkbad.coff
-	../bin/coff2noff forkbad.coff forkbad
+memory.o: memory.c
+	$(CC) $(CFLAGS) memory.c
+memory: memory.o start.o
+	$(LD) $(LDFLAGS) start.o memory.o -o memory.coff
+	../bin/coff2noff memory.coff memory 

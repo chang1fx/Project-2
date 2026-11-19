@@ -29,6 +29,7 @@
 #define SC_Close	8
 #define SC_Fork		9
 #define SC_Yield	10
+#define SC_Kill		11
 
 #ifndef IN_ASM
 
@@ -123,6 +124,9 @@ int Fork(void (*func)());	/* returns child pid, or -1 */
  * or not. 
  */
 void Yield();		
+
+/* Terminate the process identified by id; returns 0 on success, -1 on error. */
+int Kill(SpaceId id);
 
 #endif /* IN_ASM */
 

@@ -45,6 +45,8 @@
 #include "addrspace.h"
 #endif
 
+class List;
+
 // CPU register state to be saved on context switch.  
 // The SPARC and MIPS only need 10 registers, but the Snake needs 18.
 // For simplicity, this is just the max over all architectures.
@@ -102,6 +104,9 @@ class Thread {
     const char* getName() { return (name); }
     void Print() { printf("%s, ", name); }
 
+    List* getWaitingQueue() { return waitingQueue; }
+    void setWaitingQueue(List* queue) { waitingQueue = queue; }
+
   private:
     // some of the private data for this class is listed above
     
@@ -109,6 +114,7 @@ class Thread {
 					// NULL if this is the main thread
 					// (If NULL, don't deallocate stack)
     ThreadStatus status;		// ready, running or blocked
+    List* waitingQueue;
     const char* name;
 
     void StackAllocate(VoidFunctionPtr func, int arg);

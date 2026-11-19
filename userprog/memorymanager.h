@@ -26,6 +26,7 @@ class MemoryManager {
   public:
     MemoryManager(int numPages)
     {
+        pageCount = numPages;
         pages = new BitMap(numPages);
         lock = new Lock("memory manager lock");
     }
@@ -62,9 +63,64 @@ class MemoryManager {
         return n;
     }
 
+    bool ReplacePages(const int* oldFrames, int oldCount, int newCount, int* newFrames)
+    {
+        if (oldCount < 0 || newCount < 0 || newCount > pageCount ||
+            (oldCount > 0 && oldFrames == NULL) ||
+            (newCount > 0 && newFrames == NULL))
+            return FALSE;
+
+        lock->Acquire();
+
+        // Validate the old allocation before changing the bitmap
+        for (int i = 0; i < oldCount; i++) {
+            if (oldFrames[i] < 0 || oldFrames[i] >= pageCount ||
+                !pages->Test(oldFrames[i])) {
+                lock->Release();
+                return FALSE;
+            }
+            for (int j = 0; j < i; j++) {
+                if (oldFrames[i] == oldFrames[j]) {
+                    lock->Release();
+                    return FALSE;
+                }
+            }
+        }
+
+        if (newCount > oldCount + pages->NumClear()) {
+            lock->Release();
+            return FALSE;
+        }
+
+        int reused = (oldCount < newCount) ? oldCount : newCount;
+        for (int i = 0; i < reused; i++)
+            newFrames[i] = oldFrames[i];
+
+        int newlyAllocated = 0;
+        for (int i = reused; i < newCount; i++) {
+            int frame = pages->Find();
+            if (frame < 0) {
+                for (int j = 0; j < newlyAllocated; j++)
+                    pages->Clear(newFrames[reused + j]);
+                lock->Release();
+                return FALSE;
+            }
+            newFrames[i] = frame;
+            newlyAllocated++;
+        }
+
+        // Release old frames that the new image doesn't reuse.
+        for (int i = newCount; i < oldCount; i++)
+            pages->Clear(oldFrames[i]);
+
+        lock->Release();
+        return TRUE;
+    }
+
   private:
-    BitMap *pages;      // one bit per physical page, set = in use
-    Lock *lock;         // makes each operation atomic
+      int pageCount;
+      BitMap *pages;      // one bit per physical page, set = in use
+      Lock *lock;         // makes each operation atomic
 };
 
 extern MemoryManager *memoryManager;

@@ -270,6 +270,193 @@ AddrSpace::ReadFile(int virtAddr, OpenFile *file, int size, int fileAddr)
     return TRUE;
 }
 
+static bool
+ValidExecSegment(const Segment& segment, int fileLength, bool fileBacked)
+{
+    if (segment.size < 0 || segment.virtualAddr < 0)
+        return FALSE;
+
+    if (segment.virtualAddr > 0x7fffffff - segment.size)
+        return FALSE;
+
+    if (fileBacked) {
+        if (segment.inFileAddr < 0 ||
+            segment.inFileAddr > fileLength ||
+            segment.size > fileLength - segment.inFileAddr)
+            return FALSE;
+    }
+
+    return TRUE;
+}
+
+static bool
+CopyBufferToPageTable(TranslationEntry* table, unsigned int pageCount,
+    int virtAddr, const char* buffer, int size)
+{
+    int copied = 0;
+
+    while (copied < size) {
+        unsigned int address = (unsigned int)virtAddr + copied;
+        unsigned int vpn = address / PageSize;
+        int offset = address % PageSize;
+
+        if (vpn >= pageCount)
+            return FALSE;
+
+        int chunk = PageSize - offset;
+        if (chunk > size - copied)
+            chunk = size - copied;
+
+        int physicalAddress =
+            table[vpn].physicalPage * PageSize + offset;
+
+        memcpy(&machine->mainMemory[physicalAddress],
+            buffer + copied, chunk);
+        copied += chunk;
+    }
+
+    return TRUE;
+}
+
+bool
+AddrSpace::ReplaceFrom(OpenFile* executable)
+{
+    if (executable == NULL || !valid || memoryManager == NULL)
+        return FALSE;
+
+    NoffHeader noffH;
+    if (executable->ReadAt((char*)&noffH, sizeof(noffH), 0)
+        != sizeof(noffH))
+        return FALSE;
+
+    if ((noffH.noffMagic != NOFFMAGIC) &&
+        (WordToHost(noffH.noffMagic) == NOFFMAGIC))
+        SwapHeader(&noffH);
+
+    if (noffH.noffMagic != NOFFMAGIC)
+        return FALSE;
+
+    // Clear unused segment addresses
+    // The NOFF converter seemed to be leaving them uninitialized
+    if (noffH.initData.size == 0) {
+        noffH.initData.virtualAddr = 0;
+        noffH.initData.inFileAddr = 0;
+    }
+    if (noffH.uninitData.size == 0) {
+        noffH.uninitData.virtualAddr = 0;
+        noffH.uninitData.inFileAddr = 0;
+    }
+
+    int fileLength = executable->Length();
+
+    if (!ValidExecSegment(noffH.code, fileLength, TRUE) ||
+        !ValidExecSegment(noffH.initData, fileLength, TRUE) ||
+        !ValidExecSegment(noffH.uninitData, fileLength, FALSE))
+        return FALSE;
+
+    unsigned int codeEnd =
+        noffH.code.virtualAddr + noffH.code.size;
+    unsigned int dataEnd =
+        noffH.initData.virtualAddr + noffH.initData.size;
+    unsigned int bssEnd =
+        noffH.uninitData.virtualAddr + noffH.uninitData.size;
+
+    unsigned int imageEnd = codeEnd;
+    if (dataEnd > imageEnd) imageEnd = dataEnd;
+    if (bssEnd > imageEnd) imageEnd = bssEnd;
+
+    if (imageEnd > 0x7fffffffU - UserStackSize)
+        return FALSE;
+
+    unsigned int requiredBytes = imageEnd + UserStackSize;
+    unsigned int newPageCount = divRoundUp(requiredBytes, PageSize);
+
+    if (newPageCount == 0 || newPageCount > NumPhysPages)
+        return FALSE;
+
+    // Read all file-backed bytes before reusing any of the old frames
+    char* codeBuffer = NULL;
+    char* dataBuffer = NULL;
+
+    if (noffH.code.size > 0) {
+        codeBuffer = new char[noffH.code.size];
+        if (executable->ReadAt(codeBuffer, noffH.code.size,
+            noffH.code.inFileAddr) != noffH.code.size) {
+            delete[] codeBuffer;
+            return FALSE;
+        }
+    }
+
+    if (noffH.initData.size > 0) {
+        dataBuffer = new char[noffH.initData.size];
+        if (executable->ReadAt(dataBuffer, noffH.initData.size,
+            noffH.initData.inFileAddr)
+            != noffH.initData.size) {
+            delete[] codeBuffer;
+            delete[] dataBuffer;
+            return FALSE;
+        }
+    }
+
+    int* oldFrames = new int[numPages];
+    int* newFrames = new int[newPageCount];
+    TranslationEntry* newTable =
+        new TranslationEntry[newPageCount];
+
+    for (unsigned int i = 0; i < numPages; i++)
+        oldFrames[i] = pageTable[i].physicalPage;
+
+    if (!memoryManager->ReplacePages(oldFrames, numPages,
+        newPageCount, newFrames)) {
+        delete[] oldFrames;
+        delete[] newFrames;
+        delete[] newTable;
+        delete[] codeBuffer;
+        delete[] dataBuffer;
+        return FALSE;
+    }
+
+    for (unsigned int i = 0; i < newPageCount; i++) {
+        newTable[i].virtualPage = i;
+        newTable[i].physicalPage = newFrames[i];
+        newTable[i].valid = TRUE;
+        newTable[i].use = FALSE;
+        newTable[i].dirty = FALSE;
+        newTable[i].readOnly = FALSE;
+
+        memset(&machine->mainMemory[newFrames[i] * PageSize],
+            0, PageSize);
+    }
+
+    // These copies should not fail after the segment ranges and page count have been validated above
+    if (noffH.code.size > 0)
+        ASSERT(CopyBufferToPageTable(newTable, newPageCount,
+            noffH.code.virtualAddr,
+            codeBuffer, noffH.code.size));
+
+    if (noffH.initData.size > 0)
+        ASSERT(CopyBufferToPageTable(newTable, newPageCount,
+            noffH.initData.virtualAddr,
+            dataBuffer, noffH.initData.size));
+
+    TranslationEntry* oldTable = pageTable;
+    pageTable = newTable;
+    numPages = newPageCount;
+    valid = TRUE;
+
+    delete[] oldTable;
+    delete[] oldFrames;
+    delete[] newFrames;
+    delete[] codeBuffer;
+    delete[] dataBuffer;
+
+    printf("Loaded Program: %d code | %d data | %d bss\n",
+        noffH.code.size, noffH.initData.size,
+        noffH.uninitData.size);
+
+    return TRUE;
+}
+
 #else
 
 //----------------------------------------------------------------------

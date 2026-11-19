@@ -236,3 +236,29 @@ List::SortedRemove(int *keyPtr)
     return thing;
 }
 
+bool
+List::RemoveItem(void* item) 
+{
+    ListElement* previous = NULL;
+    ListElement* current = first;
+
+    while (current != NULL) {
+        if (current->item == item) {
+            if (previous == NULL)
+                first = current->next;
+            else
+                previous->next = current->next;
+
+            if (last == current)
+                last = previous;
+
+            delete current;
+            return TRUE;
+        }
+
+        previous = current;
+        current = current->next;
+    }
+
+    return FALSE;
+}

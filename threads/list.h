@@ -53,6 +53,7 @@ class List {
 					// on the list
     bool IsEmpty();		// is the list empty? 
     
+    bool RemoveItem(void* item);
 
     // Routines to put/get items on/off list in order (sorted by key)
     void SortedInsert(void *item, int sortKey);	// Put item into list

@@ -161,6 +161,76 @@ DoJoin(int pid)
     return processManager->joinProcess(currentThread->space->pcb, pid);
 }
 
+#define MAX_EXEC_FILENAME 256
+
+static bool
+CopyStringFromUser(int userAddress, char* destination, int capacity)
+{
+    if (userAddress < 0 || destination == NULL || capacity <= 0)
+        return FALSE;
+
+    for (int i = 0; i < capacity; i++) {
+        if (userAddress > 0x7fffffff - i)
+            return FALSE;
+
+        int physicalAddress;
+        ExceptionType error =
+            machine->Translate(userAddress + i, &physicalAddress, 1, FALSE);
+
+        if (error != NoException)
+            return FALSE;
+
+        char value = machine->mainMemory[physicalAddress];
+        destination[i] = value;
+
+        if (value == '\0')
+            return i > 0;
+    }
+
+    destination[capacity - 1] = '\0';
+    return FALSE;
+}
+
+static void
+ExecCurrentProcess(int userFilenameAddress)
+{
+    char filename[MAX_EXEC_FILENAME];
+
+    if (!CopyStringFromUser(userFilenameAddress, filename,
+        MAX_EXEC_FILENAME)) {
+        machine->WriteRegister(2, -1);
+        IncrementPC();
+        return;
+    }
+
+    int pid = CurrentPid();
+    printf("Exec Program: %d loading %s\n", pid, filename);
+
+    OpenFile* executable = fileSystem->Open(filename);
+    if (executable == NULL) {
+        machine->WriteRegister(2, -1);
+        IncrementPC();
+        return;
+    }
+
+    if (currentThread->space == NULL ||
+        !currentThread->space->ReplaceFrom(executable)) {
+        delete executable;
+        machine->WriteRegister(2, -1);
+        IncrementPC();
+        return;
+    }
+
+    delete executable;
+
+    currentThread->space->InitRegisters();
+    machine->WriteRegister(2, 1);
+    currentThread->space->RestoreState();
+
+    machine->Run(); // starts the replacement image at its entry point
+    ASSERT(FALSE);
+}
+
 
 //----------------------------------------------------------------------
 // ExceptionHandler
@@ -195,6 +265,11 @@ ExceptionHandler(ExceptionType which)
 	interrupt->Halt();
 	break;
 
+    case SC_Exec:
+        printf("System Call: [%d] invoked Exec\n", CurrentPid());
+        ExecCurrentProcess(machine->ReadRegister(4));
+        break;
+
     case SC_Fork:
 	printf("System Call: %d invoked Fork\n", CurrentPid());
 	machine->WriteRegister(2, DoFork(machine->ReadRegister(4)));
@@ -212,11 +287,39 @@ ExceptionHandler(ExceptionType which)
         break;
 
     case SC_Yield:
-	printf("System Call: %d invoked Yield\n", CurrentPid());
-	IncrementPC();			// advance first, so we resume after
+	    printf("System Call: %d invoked Yield\n", CurrentPid());
+	    IncrementPC();			// advance first, so we resume after
 					// the syscall when rescheduled
-	currentThread->Yield();
-	break;
+	    currentThread->Yield();
+	    break;
+
+    case SC_Kill: {
+        int callerPID = CurrentPid();
+        printf("System Call: [%d] invoked Kill\n", callerPID);
+
+        int targetPID = machine->ReadRegister(4);
+
+        if (targetPID == callerPID) {
+            printf("Process [%d] killed process [%d]\n",
+                callerPID, targetPID);
+            DoExit(0); // self-kill uses the normal exit cleanup path
+        }
+
+        int result = processManager->Kill(targetPID);
+
+        if (result == 0) {
+            printf("Process [%d] killed process [%d]\n",
+                callerPID, targetPID);
+        }
+        else {
+            printf("Process [%d] cannot kill process [%d]: doesn't exist\n",
+                callerPID, targetPID);
+        }
+
+        machine->WriteRegister(2, result);
+        IncrementPC();
+        break;
+    }
 
     default:
 	printf("Unexpected user mode exception %d %d\n", which, type);

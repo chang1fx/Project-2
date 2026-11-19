@@ -134,6 +134,30 @@ Scheduler::Run (Thread *nextThread)
 #endif
 }
 
+bool
+Scheduler::RemoveThread(Thread* target) 
+{
+    IntStatus oldLevel = interrupt->SetLevel(IntOff);
+    bool found = FALSE;
+
+    // Marker tells us when we have processed the original queue
+    void* marker = (void*)this;
+    readyList->Append(marker);
+
+    void* item;
+    while ((item = readyList->Remove()) != marker) {
+        if (item == target) {
+            found = TRUE;
+        }
+        else {
+            readyList->Append(item); // puts the other threads back in their original order
+        }
+    }
+
+    (void)interrupt->SetLevel(oldLevel);
+    return found;
+}
+
 //----------------------------------------------------------------------
 // Scheduler::Print
 // 	Print the scheduler state -- in other words, the contents of

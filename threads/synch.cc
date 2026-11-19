@@ -67,9 +67,12 @@ Semaphore::P()
     IntStatus oldLevel = interrupt->SetLevel(IntOff);	// disable interrupts
     
     while (value == 0) { 			// semaphore not available
-	queue->Append((void *)currentThread);	// so go to sleep
-	currentThread->Sleep();
+        currentThread->setWaitingQueue(queue);
+	    queue->Append((void *)currentThread);	// so go to sleep
+	    currentThread->Sleep();
+        currentThread->setWaitingQueue(NULL);
     } 
+
     value--; 					// semaphore available, 
 						// consume its value
     
@@ -87,12 +90,15 @@ Semaphore::P()
 void
 Semaphore::V()
 {
-    Thread *thread;
+    Thread* thread;
     IntStatus oldLevel = interrupt->SetLevel(IntOff);
 
-    thread = (Thread *)queue->Remove();
-    if (thread != NULL)	   // make thread ready, consuming the V immediately
-	scheduler->ReadyToRun(thread);
+    thread = (Thread*)queue->Remove();
+    if (thread != NULL){	   // make thread ready, consuming the V immediately
+        thread->setWaitingQueue(NULL);
+        scheduler->ReadyToRun(thread);
+    }
+
     value++;
     (void) interrupt->SetLevel(oldLevel);
 }
@@ -136,8 +142,10 @@ Lock::Acquire()
 
     ASSERT(!isHeldByCurrentThread());     // no re-acquiring your own lock
     while (owner != NULL) {               // lock busy, go to sleep
-        queue->Append((void *)currentThread);
+        currentThread->setWaitingQueue(queue);
+        queue->Append((void*)currentThread);
         currentThread->Sleep();
+        currentThread->setWaitingQueue(NULL);
     }
     owner = currentThread;
 
@@ -158,8 +166,11 @@ Lock::Release()
 
     ASSERT(isHeldByCurrentThread());
     thread = (Thread *)queue->Remove();
-    if (thread != NULL)                   // make a waiter ready to run
+    if (thread != NULL) {                  // make a waiter ready to run
+        thread->setWaitingQueue(NULL);
         scheduler->ReadyToRun(thread);
+    }
+
     owner = NULL;
 
     (void) interrupt->SetLevel(oldLevel);
@@ -218,9 +229,11 @@ Condition::Wait(Lock* conditionLock)
     IntStatus oldLevel = interrupt->SetLevel(IntOff);
 
     ASSERT(conditionLock->isHeldByCurrentThread());
-    queue->Append((void *)currentThread);
+    currentThread->setWaitingQueue(queue);
+    queue->Append((void*)currentThread);
     conditionLock->Release();
     currentThread->Sleep();             // releasing + sleeping is atomic
+    currentThread->setWaitingQueue(NULL);
 
     (void) interrupt->SetLevel(oldLevel);
     conditionLock->Acquire();           // get the lock back before returning
@@ -240,8 +253,10 @@ Condition::Signal(Lock* conditionLock)
 
     ASSERT(conditionLock->isHeldByCurrentThread());
     thread = (Thread *)queue->Remove();
-    if (thread != NULL)
+    if (thread != NULL) {
+        thread->setWaitingQueue(NULL);
         scheduler->ReadyToRun(thread);
+    }
 
     (void) interrupt->SetLevel(oldLevel);
 }
@@ -259,8 +274,10 @@ Condition::Broadcast(Lock* conditionLock)
     IntStatus oldLevel = interrupt->SetLevel(IntOff);
 
     ASSERT(conditionLock->isHeldByCurrentThread());
-    while ((thread = (Thread *)queue->Remove()) != NULL)
+    while ((thread = (Thread*)queue->Remove()) != NULL) {
+        thread->setWaitingQueue(NULL);
         scheduler->ReadyToRun(thread);
+    }
 
     (void) interrupt->SetLevel(oldLevel);
 }

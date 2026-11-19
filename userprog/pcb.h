@@ -167,6 +167,45 @@ class ProcessManager {
         lock->Release();
     }
 
+    // Kill a process that is currently in the ready queue
+    // Returns 0 on sucess or -1 if the PID is invalid or the target cannot be safely removed
+    int Kill(int pid)
+    {
+        IntStatus oldLevel = interrupt->SetLevel(IntOff);
+
+        PCB* target = getPCB(pid);
+        if (target == NULL || target->exited || target->thread == NULL) {
+            (void)interrupt->SetLevel(oldLevel);
+            return -1;
+        }
+
+        Thread* victim = target->thread;
+        if (victim == currentThread) {
+            (void)interrupt->SetLevel(oldLevel);
+            return -1; // ExceptionHandler routes self-kill through DoExit.
+        }
+
+        // Remove a runnable thread from the ready queue. If it is blocked, remove it from the synchronization queue where it is waiting.
+        if (!scheduler->RemoveThread(victim)) {
+            List* waitQueue = victim->getWaitingQueue();
+            if (waitQueue == NULL || !waitQueue->RemoveItem(victim)) {
+                (void)interrupt->SetLevel(oldLevel);
+                return -1;
+            }
+            victim->setWaitingQueue(NULL);
+        }
+
+        AddrSpace* space = victim->space;
+        victim->space = NULL;
+        delete space;
+
+        finishProcess(target, -1);
+        delete victim;
+
+        (void)interrupt->SetLevel(oldLevel);
+        return 0;
+    }
+
   private:
     // Caller holds lock; the process has already exited.
     void reapLocked(PCB *pcb)

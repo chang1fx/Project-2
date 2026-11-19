@@ -52,6 +52,8 @@ class AddrSpace {
 					// Copy "size" bytes at "fileAddr" in
 					// "file" into this space, starting at
 					// virtual address "virtAddr"
+    
+    bool ReplaceFrom(OpenFile* executable);
 
     PCB *pcb;				// the process that owns this space
 #endif
